@@ -1,0 +1,16 @@
+# Ambientes virtuais
+env/
+venv/
+__pycache__/
+
+# Configurações locais
+.idea/
+*.env
+.env
+*.sqlite3
+
+# Uploads temporários
+uploads/
+
+# ChromaDB persiste em um diretório interno; pode ser ignorado se desejar
+chromadb/

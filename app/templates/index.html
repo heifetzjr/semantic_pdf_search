@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Busca Semântica em PDFs</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+
+    <header>
+        <h1>📄 Busca Semântica em PDFs</h1>
+        <p class="subtitle">
+            Carregue quantos PDFs quiser. Texto e imagens serão analisados juntos.
+        </p>
+    </header>
+
+    <main class="container">
+
+        <!-- UPLOAD -->
+        <section class="card">
+            <h2>1️⃣ Enviar PDF</h2>
+            <p class="section-hint">
+                O sistema extrai texto e imagens automaticamente.
+                Cada PDF é adicionado ao banco sem apagar os anteriores.
+            </p>
+
+            <form id="uploadForm">
+                <div class="form-row">
+                    <input type="file" id="fileInput" accept=".pdf" required>
+                    <button type="submit" id="uploadBtn">Enviar</button>
+                </div>
+            </form>
+
+            <div id="uploadMsg" class="msg"></div>
+
+            <!-- Lista de PDFs indexados -->
+            <div id="pdfListContainer" class="pdf-list-container hidden">
+                <div class="pdf-list-header">
+                    <strong>PDFs indexados:</strong>
+                    <button type="button" id="clearAllBtn" class="btn btn-danger">
+                        🧹 Limpar tudo
+                    </button>
+                </div>
+                <ul id="pdfList" class="pdf-list"></ul>
+                <p id="pdfCount" class="pdf-count"></p>
+            </div>
+        </section>
+
+        <!-- BUSCA -->
+        <section class="card">
+            <h2>2️⃣ Consultar</h2>
+            <p class="section-hint">
+                Será consultado textos e imagens de todos os PDFs carregados.
+                A resposta será no mesmo idioma da sua pergunta.
+            </p>
+            <form id="searchForm">
+                <div class="form-row">
+                    <input type="text" id="queryInput" placeholder="Digite sua pergunta em qualquer idioma..." required>
+                    <input type="number" id="topKInput" value="50" min="1" max="50"
+                        title="Quantidade de trechos considerados pela IA">
+                    <button type="submit">Buscar</button>
+                </div>
+            </form>
+            <div id="searchResults"></div>
+        </section>
+
+    </main>
+
+    <!-- Alerta personalizado -->
+    <div id="alertOverlay" class="alert-overlay hidden">
+        <div class="alert-box">
+            <p id="alertMessage" class="alert-message"></p>
+            <div class="alert-actions">
+                <button id="alertCancel" class="btn btn-secondary">Cancelar</button>
+                <button id="alertConfirm" class="btn btn-danger">Confirmar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+
+</html>
