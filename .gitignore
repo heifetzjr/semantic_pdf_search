@@ -1,7 +1,12 @@
 # Ambientes virtuais
+.venv/
 env/
-venv/
 __pycache__/
+*.pyc
+*.pyo
+.idea/
+db.sqlite3
+*.env
 
 # Configurações locais
 .idea/
