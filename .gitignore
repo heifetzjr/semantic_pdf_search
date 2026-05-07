@@ -12,10 +12,10 @@ db.sqlite3
 .idea/
 *.env
 .env
-*.sqlite3
+# *.sqlite3
 
-# Uploads temporários
-uploads/
+# # Uploads temporários
+# uploads/
 
-# ChromaDB persiste em um diretório interno; pode ser ignorado se desejar
-chromadb/
+# # ChromaDB persiste em um diretório interno; pode ser ignorado se desejar
+# chromadb/

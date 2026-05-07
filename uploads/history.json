@@ -1,0 +1,23 @@
+[
+  {
+    "file_id": "c05187bbd2f648b387a91abf9b3abe50",
+    "filename": "Ata da reunião.pdf",
+    "path": "uploads\\c05187bbd2f648b387a91abf9b3abe50_Ata da reunião.pdf",
+    "chunks": 4,
+    "text_chunks": 2,
+    "image_chunks": 2,
+    "image_paths": [
+      "uploads\\images\\c05187bbd2f648b387a91abf9b3abe50_Ata da reunião_p1_i2.png",
+      "uploads\\images\\c05187bbd2f648b387a91abf9b3abe50_Ata da reunião_p2_i2.png"
+    ]
+  },
+  {
+    "file_id": "a1b2e89b2e1c4b29ab4ca9c619042d92",
+    "filename": "Currículum Everson Zattoni 2025.pdf",
+    "path": "uploads\\a1b2e89b2e1c4b29ab4ca9c619042d92_Currículum Everson Zattoni 2025.pdf",
+    "chunks": 2,
+    "text_chunks": 2,
+    "image_chunks": 0,
+    "image_paths": []
+  }
+]
