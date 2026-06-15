@@ -1,0 +1,52 @@
+{
+  "page_title": "Busca Semântica em PDFs",
+  "header_title": "📄 Busca Semântica em PDFs",
+  "header_subtitle": "Carregue quantos PDFs quiser. Texto e imagens serão analisados juntos.",
+
+  "step1": "1️⃣ Enviar PDF",
+  "step1_hint": "O sistema extrai texto e imagens automaticamente. Cada PDF é adicionado ao banco sem apagar os anteriores.",
+  "upload_btn": "Enviar",
+  "file_input_label": "Selecione um arquivo PDF",
+
+  "pdfs_label": "PDFs indexados:",
+  "clear_all": "🧹 Limpar tudo",
+  "label_text": "texto",
+  "label_img": "img",
+  "remove_title": "Remover este PDF do banco",
+  "pdf_count": "Total: {n} PDF(s) | {chunks} trechos | {images} imagem(ns)",
+
+  "step2": "2️⃣ Consultar",
+  "step2_hint": "A IA consultará texto e imagens de todos os PDFs carregados. A resposta será no mesmo idioma da sua pergunta.",
+  "query_placeholder": "Digite sua pergunta em qualquer idioma...",
+  "topk_title": "Quantidade de trechos considerados pela IA",
+  "search_btn": "Buscar",
+
+  "alert_confirm": "Confirmar",
+  "alert_cancel": "Cancelar",
+  "alert_clear_msg": "Deseja limpar TODO o banco? Todos os dados indexados serão removidos permanentemente.",
+  "alert_delete_msg": "Deseja remover \"{filename}\" e todos os seus dados do banco?",
+
+  "msg_select_file": "Selecione um arquivo PDF.",
+  "msg_sending": "📥 Enviando arquivo...",
+  "msg_send_error": "Erro ao enviar PDF.",
+  "msg_conn_error": "Erro de conexão ao enviar o arquivo.",
+  "msg_waiting": "⏳ Aguardando início do processamento...",
+  "msg_large_pdf": "PDF grande detectado, aguarde...",
+  "msg_conn_status": "Erro de conexão. Recarregue a página para verificar.",
+  "msg_remove_error": "Erro ao remover PDF.",
+  "msg_remove_conn": "Erro de conexão ao remover PDF.",
+  "msg_clear_error": "Erro ao limpar banco.",
+  "msg_clear_conn": "Erro de conexão ao limpar banco.",
+  "msg_no_query": "Digite uma pergunta.",
+  "msg_no_pdf": "Envie ao menos um PDF antes de consultar.",
+  "msg_searching": "Consultando IA em todos os PDFs indexados...",
+  "msg_no_answer": "Sem resposta.",
+  "msg_search_error": "Erro ao consultar. Tente novamente.",
+  "msg_load_error": "Erro ao carregar a lista de PDFs.",
+  "msg_already_sent": "Este arquivo já foi enviado anteriormente.",
+  "msg_only_pdf": "Apenas arquivos PDF são aceitos.",
+
+  "status_processing": "Processando...",
+  "status_done": "Concluído",
+  "status_error": "Erro"
+}

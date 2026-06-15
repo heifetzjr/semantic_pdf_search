@@ -3,44 +3,46 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Busca Semântica em PDFs</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title data-i18n="page_title">Busca Semântica em PDFs</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 
 <body>
 
     <header>
-        <h1>📄 Busca Semântica em PDFs</h1>
-        <p class="subtitle">
+        <h1 data-i18n="header_title">📄 Busca Semântica em PDFs</h1>
+        <p class="subtitle" data-i18n="header_subtitle">
             Carregue quantos PDFs quiser. Texto e imagens serão analisados juntos.
         </p>
+        <nav id="langNav"></nav>
     </header>
 
     <main class="container">
 
         <!-- UPLOAD -->
-        <section class="card">
-            <h2>1️⃣ Enviar PDF</h2>
-            <p class="section-hint">
+        <section class="card card--upload">
+            <h2 data-i18n="step1">1️⃣ Enviar PDF</h2>
+            <p class="section-hint" data-i18n="step1_hint">
                 O sistema extrai texto e imagens automaticamente.
-                Cada PDF é adicionado ao banco sem apagar os anteriores.
             </p>
 
             <form id="uploadForm">
                 <div class="form-row">
-                    <input type="file" id="fileInput" accept=".pdf" required>
-                    <button type="submit" id="uploadBtn">Enviar</button>
+                    <input type="file" id="fileInput" accept=".pdf" required data-i18n-title="file_input_label"
+                        title="Selecione um arquivo PDF">
+                    <button type="submit" id="uploadBtn" data-i18n="upload_btn">
+                        Enviar
+                    </button>
                 </div>
             </form>
 
             <div id="uploadMsg" class="msg"></div>
 
-            <!-- Lista de PDFs indexados -->
             <div id="pdfListContainer" class="pdf-list-container hidden">
                 <div class="pdf-list-header">
-                    <strong>PDFs indexados:</strong>
-                    <button type="button" id="clearAllBtn" class="btn btn-danger">
+                    <strong data-i18n="pdfs_label">PDFs indexados:</strong>
+                    <button type="button" id="clearAllBtn" class="btn btn-danger" data-i18n="clear_all">
                         🧹 Limpar tudo
                     </button>
                 </div>
@@ -50,32 +52,40 @@
         </section>
 
         <!-- BUSCA -->
-        <section class="card">
-            <h2>2️⃣ Consultar</h2>
-            <p class="section-hint">
-                Será consultado textos e imagens de todos os PDFs carregados.
-                A resposta será no mesmo idioma da sua pergunta.
+        <section class="card card--search">
+            <h2 data-i18n="step2">2️⃣ Consultar</h2>
+            <p class="section-hint" data-i18n="step2_hint">
+                A IA consultará texto e imagens de todos os PDFs carregados.
             </p>
+
             <form id="searchForm">
                 <div class="form-row">
-                    <input type="text" id="queryInput" placeholder="Digite sua pergunta em qualquer idioma..." required>
-                    <input type="number" id="topKInput" value="50" min="1" max="50"
+                    <input type="text" id="queryInput" data-i18n-placeholder="query_placeholder"
+                        placeholder="Digite sua pergunta em qualquer idioma..." required>
+                    <input type="number" id="topKInput" value="10" min="1" max="50" data-i18n-title="topk_title"
                         title="Quantidade de trechos considerados pela IA">
-                    <button type="submit">Buscar</button>
+                    <button type="submit" id="searchBtn" data-i18n="search_btn">
+                        Buscar
+                    </button>
                 </div>
             </form>
+
             <div id="searchResults"></div>
         </section>
 
     </main>
 
-    <!-- Alerta personalizado -->
+    <!-- Modal de alerta -->
     <div id="alertOverlay" class="alert-overlay hidden">
         <div class="alert-box">
             <p id="alertMessage" class="alert-message"></p>
             <div class="alert-actions">
-                <button id="alertCancel" class="btn btn-secondary">Cancelar</button>
-                <button id="alertConfirm" class="btn btn-danger">Confirmar</button>
+                <button id="alertCancel" class="btn btn-secondary" data-i18n="alert_cancel">
+                    Cancelar
+                </button>
+                <button id="alertConfirm" class="btn btn-danger" data-i18n="alert_confirm">
+                    Confirmar
+                </button>
             </div>
         </div>
     </div>

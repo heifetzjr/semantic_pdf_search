@@ -1,0 +1,52 @@
+{
+  "page_title": "Ricerca Semantica nei PDF",
+  "header_title": "📄 Ricerca Semantica nei PDF",
+  "header_subtitle": "Carica quanti PDF desideri. Testo e immagini verranno analizzati insieme.",
+
+  "step1": "1️⃣ Carica PDF",
+  "step1_hint": "Il sistema estrae automaticamente testo e immagini. Ogni PDF viene aggiunto al database senza sovrascrivere i precedenti.",
+  "upload_btn": "Carica",
+  "file_input_label": "Seleziona un file PDF",
+
+  "pdfs_label": "PDF indicizzati:",
+  "clear_all": "🧹 Cancella tutto",
+  "label_text": "testo",
+  "label_img": "img",
+  "remove_title": "Rimuovi questo PDF dal database",
+  "pdf_count": "Totale: {n} PDF | {chunks} estratti | {images} immagine/i",
+
+  "step2": "2️⃣ Consulta",
+  "step2_hint": "L'IA interrogherà testo e immagini di tutti i PDF caricati. La risposta sarà nella stessa lingua della tua domanda.",
+  "query_placeholder": "Scrivi la tua domanda in qualsiasi lingua...",
+  "topk_title": "Numero di estratti considerati dall'IA",
+  "search_btn": "Cerca",
+
+  "alert_confirm": "Conferma",
+  "alert_cancel": "Annulla",
+  "alert_clear_msg": "Vuoi cancellare l'INTERO database? Tutti i dati indicizzati verranno rimossi definitivamente.",
+  "alert_delete_msg": "Vuoi eliminare \"{filename}\" e tutti i suoi dati dal database?",
+
+  "msg_select_file": "Seleziona un file PDF.",
+  "msg_sending": "📥 Caricamento in corso...",
+  "msg_send_error": "Errore durante il caricamento del PDF.",
+  "msg_conn_error": "Errore di connessione durante il caricamento.",
+  "msg_waiting": "⏳ In attesa dell'avvio dell'elaborazione...",
+  "msg_large_pdf": "PDF di grandi dimensioni rilevato, attendere...",
+  "msg_conn_status": "Errore di connessione. Ricarica la pagina per verificare.",
+  "msg_remove_error": "Errore durante la rimozione del PDF.",
+  "msg_remove_conn": "Errore di connessione durante la rimozione del PDF.",
+  "msg_clear_error": "Errore durante la pulizia del database.",
+  "msg_clear_conn": "Errore di connessione durante la pulizia del database.",
+  "msg_no_query": "Scrivi una domanda.",
+  "msg_no_pdf": "Carica almeno un PDF prima di effettuare una ricerca.",
+  "msg_searching": "Interrogazione dell'IA su tutti i PDF indicizzati...",
+  "msg_no_answer": "Nessuna risposta trovata.",
+  "msg_search_error": "Errore di ricerca. Riprova.",
+  "msg_load_error": "Errore durante il caricamento dell'elenco PDF.",
+  "msg_already_sent": "Questo file è già stato caricato in precedenza.",
+  "msg_only_pdf": "Sono accettati solo file PDF.",
+
+  "status_processing": "Elaborazione...",
+  "status_done": "Completato",
+  "status_error": "Errore"
+}

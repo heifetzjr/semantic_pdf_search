@@ -11,15 +11,17 @@ import json
 
 from app.services.pdf_service import extract_text_and_images
 from app.services.image_caption_service import describe_images_bulk
-from app.services.embedding_service import get_embeddings, embed_query
+from app.services.embedding_service import get_embeddings, embed_query, get_vector_size
 from app.services.vector_store_service import (
     init_vector_store,
     clear_vector_store,
     add_documents,
     similarity_search,
     delete_documents_by_file,
+    VECTOR_SIZE,
 )
 from app.services.llm_service import answer_with_rag, generate_summary_and_topics
+from pathlib import Path
 
 app = FastAPI(title="Busca Semântica em PDFs")
 
@@ -28,7 +30,7 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 HISTORY_FILE = Path("history.json")
 
-vector_store  = init_vector_store(persist_directory="chromadb")
+qdrant_client = init_vector_store()
 upload_status: dict[str, dict] = {}
 
 
@@ -50,9 +52,9 @@ def save_history(history: list[dict]):
 
 def process_pdf_background(file_id: str, file_bytes: bytes, filename: str):
     """
-    Processa o PDF a partir dos bytes (sem salvar em disco):
+    Processa o PDF a partir dos bytes:
     extrai texto e imagens, descreve imagens, gera embeddings,
-    indexa no Chroma e salva só os metadados no histórico.
+    indexa no Qdrant com referência de página e salva metadados.
     """
     upload_status[file_id] = {
         "status":  "processando",
@@ -60,7 +62,7 @@ def process_pdf_background(file_id: str, file_bytes: bytes, filename: str):
     }
 
     try:
-        # 1. Extrai texto e imagens dos bytes
+        # 1. Extrai texto e imagens
         print(f"[Upload] Extraindo conteúdo de '{filename}'...")
         extracted = extract_text_and_images(file_bytes, filename)
         pages     = extracted["pages"]
@@ -77,7 +79,7 @@ def process_pdf_background(file_id: str, file_bytes: bytes, filename: str):
             }
             return
 
-        # 2. Descreve imagens em paralelo (a partir dos bytes, sem salvar)
+        # 2. Descreve imagens em paralelo
         described_images = []
         if images:
             upload_status[file_id]["message"] = (
@@ -87,20 +89,29 @@ def process_pdf_background(file_id: str, file_bytes: bytes, filename: str):
             described_images = describe_images_bulk(images)
             print(f"[Upload] {len(described_images)} imagem(ns) descritas.")
 
-        # 3. Monta chunks (texto + descrições de imagens)
+        # 3. Monta chunks com page_number em cada um
         upload_status[file_id]["message"] = "Preparando trechos para indexação..."
 
-        chunks:      list[str] = []
-        chunk_types: list[str] = []
+        chunks:      list[str]  = []
+        chunk_types: list[str]  = []
+        page_numbers: list[int] = []
 
-        if all_text.strip():
-            text_chunks = [c.strip() for c in all_text.split("\n\n") if c.strip()]
-            chunks.extend(text_chunks)
-            chunk_types.extend(["text"] * len(text_chunks))
+        # Chunks de texto — preserva o número da página de origem
+        for page in pages:
+            if not page["text"].strip():
+                continue
+            page_chunks = [c.strip() for c in page["text"].split("\n\n") if c.strip()]
+            for chunk in page_chunks:
+                chunks.append(chunk)
+                chunk_types.append("text")
+                page_numbers.append(page["page_number"])
 
+        # Chunks de imagens
         for img in described_images:
-            chunks.append(f"[Imagem na página {img['page_number']}]\n{img['caption']}")
+            caption_text = f"[Imagem na página {img['page_number']}]\n{img['caption']}"
+            chunks.append(caption_text)
             chunk_types.append("image")
+            page_numbers.append(img["page_number"])
 
         if not chunks:
             upload_status[file_id] = {
@@ -111,7 +122,7 @@ def process_pdf_background(file_id: str, file_bytes: bytes, filename: str):
 
         print(f"[Upload] Total de chunks: {len(chunks)}.")
 
-        # 4. Gera resumo e tópicos do PDF
+        # 4. Gera resumo e tópicos
         upload_status[file_id]["message"] = "Gerando resumo e tópicos do documento..."
         text_only_chunks = [c for c, t in zip(chunks, chunk_types) if t == "text"]
         meta_doc         = generate_summary_and_topics(text_only_chunks)
@@ -126,9 +137,9 @@ def process_pdf_background(file_id: str, file_bytes: bytes, filename: str):
         embeddings = get_embeddings(chunks)
         print(f"[Upload] Embeddings gerados.")
 
-        # 6. Indexa no ChromaDB
+        # 6. Indexa no Qdrant com page_number nos metadados
         upload_status[file_id]["message"] = "Indexando no banco vetorial..."
-        print(f"[Upload] Indexando no ChromaDB...")
+        print(f"[Upload] Indexando no Qdrant...")
 
         docs_metadata = [
             {
@@ -136,14 +147,15 @@ def process_pdf_background(file_id: str, file_bytes: bytes, filename: str):
                 "filename":    filename,
                 "chunk_index": i,
                 "chunk_type":  chunk_types[i],
+                "page_number": page_numbers[i],
                 "text":        chunk,
             }
             for i, chunk in enumerate(chunks)
         ]
-        add_documents(vector_store, embeddings, docs_metadata)
+        add_documents(qdrant_client, embeddings, docs_metadata)
         print(f"[Upload] Indexação concluída.")
 
-        # 7. Atualiza histórico (só metadados, sem path nem imagens)
+        # 7. Atualiza histórico
         n_text  = chunk_types.count("text")
         n_image = chunk_types.count("image")
 
@@ -195,10 +207,6 @@ async def upload_pdf(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
 ):
-    """
-    Lê o PDF em memória e dispara o processamento em background.
-    Não salva nada em disco.
-    """
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Apenas arquivos PDF são aceitos.")
 
@@ -209,7 +217,6 @@ async def upload_pdf(
             detail=f"'{file.filename}' já foi enviado. Remova-o antes de reenviar.",
         )
 
-    # Lê os bytes do PDF em memória (sem salvar em disco)
     file_bytes = await file.read()
     file_id    = uuid.uuid4().hex
 
@@ -235,7 +242,6 @@ async def upload_pdf(
 
 @app.get("/upload-status/{file_id}")
 async def get_upload_status(file_id: str):
-    """Retorna o status atual do processamento de um PDF."""
     status = upload_status.get(file_id)
     if not status:
         raise HTTPException(status_code=404, detail="Status não encontrado.")
@@ -244,29 +250,24 @@ async def get_upload_status(file_id: str):
 
 @app.get("/pdfs")
 async def list_pdfs():
-    """Lista todos os PDFs indexados com nome, resumo e tópicos."""
     return JSONResponse({"pdfs": load_history()})
 
 
 @app.delete("/delete-pdf/{file_id}")
 async def delete_pdf(file_id: str):
-    """Remove um PDF do banco vetorial e do histórico."""
     history = load_history()
     item    = next((p for p in history if p["file_id"] == file_id), None)
 
     if not item:
         raise HTTPException(status_code=404, detail="PDF não encontrado.")
 
-    # Remove vetores do ChromaDB
-    delete_documents_by_file(vector_store, file_id)
-    print(f"[Delete] Vetores removidos para file_id={file_id}")
+    delete_documents_by_file(qdrant_client, file_id)
 
-    # Remove do status e do histórico
     upload_status.pop(file_id, None)
     history = [p for p in history if p["file_id"] != file_id]
     save_history(history)
 
-    print(f"[Delete] ✅ '{item['filename']}' removido do banco.")
+    print(f"[Delete] ✅ '{item['filename']}' removido do Qdrant.")
 
     return JSONResponse({
         "message": f"🗑️ '{item['filename']}' removido do banco com sucesso.",
@@ -275,10 +276,9 @@ async def delete_pdf(file_id: str):
 
 @app.delete("/clear-all")
 async def clear_all():
-    """Limpa todo o banco vetorial e o histórico."""
-    global vector_store
+    global qdrant_client
 
-    vector_store = clear_vector_store(persist_directory="chromadb")
+    qdrant_client = clear_vector_store()
     upload_status.clear()
     save_history([])
 
@@ -292,13 +292,9 @@ async def clear_all():
 @app.post("/search")
 async def semantic_search(
     request: Request,
-    query: str  = Form(...),
-    top_k: int  = Form(10),
+    query: str = Form(...),
+    top_k: int = Form(10),
 ):
-    """
-    Busca semântica em todos os PDFs indexados.
-    Responde no mesmo idioma da pergunta.
-    """
     if not query.strip():
         raise HTTPException(status_code=400, detail="A consulta não pode ser vazia.")
 
@@ -306,7 +302,7 @@ async def semantic_search(
         raise HTTPException(status_code=400, detail="Nenhum PDF foi enviado ainda.")
 
     query_emb = embed_query(query)
-    results   = similarity_search(vector_store, query_emb, top_k=top_k)
+    results   = similarity_search(qdrant_client, query_emb, top_k=top_k)
 
     if not results:
         return JSONResponse({
@@ -320,3 +316,23 @@ async def semantic_search(
         "query":  query,
         "answer": answer,
     })
+
+I18N_DIR = Path("app/static/i18n")
+
+
+@app.get("/languages")
+async def list_languages():
+    """
+    Lista todos os arquivos .json disponíveis na pasta i18n/.
+    Retorna: [{"code": "pt", "label": "pt"}, ...]
+    O front usa isso para popular o seletor dinamicamente.
+    """
+    if not I18N_DIR.exists():
+        return JSONResponse({"languages": []})
+
+    languages = []
+    for f in sorted(I18N_DIR.glob("*.json")):
+        code = f.stem  # "pt", "en", "it", etc.
+        languages.append({"code": code})
+
+    return JSONResponse({"languages": languages})

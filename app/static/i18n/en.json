@@ -1,0 +1,52 @@
+{
+  "page_title": "Semantic PDF Search",
+  "header_title": "📄 Semantic PDF Search",
+  "header_subtitle": "Upload as many PDFs as you want. Text and images will be analyzed together.",
+
+  "step1": "1️⃣ Upload PDF",
+  "step1_hint": "The system extracts text and images automatically. Each PDF is added to the database without removing the previous ones.",
+  "upload_btn": "Upload",
+  "file_input_label": "Select a PDF file",
+
+  "pdfs_label": "Indexed PDFs:",
+  "clear_all": "🧹 Clear all",
+  "label_text": "text",
+  "label_img": "img",
+  "remove_title": "Remove this PDF from the database",
+  "pdf_count": "Total: {n} PDF(s) | {chunks} excerpts | {images} image(s)",
+
+  "step2": "2️⃣ Search",
+  "step2_hint": "The AI will query text and images from all uploaded PDFs. The answer will be in the same language as your question.",
+  "query_placeholder": "Type your question in any language...",
+  "topk_title": "Number of excerpts considered by the AI",
+  "search_btn": "Search",
+
+  "alert_confirm": "Confirm",
+  "alert_cancel": "Cancel",
+  "alert_clear_msg": "Do you want to clear the ENTIRE database? All indexed data will be permanently removed.",
+  "alert_delete_msg": "Do you want to remove \"{filename}\" and all its data from the database?",
+
+  "msg_select_file": "Please select a PDF file.",
+  "msg_sending": "📥 Uploading file...",
+  "msg_send_error": "Error uploading PDF.",
+  "msg_conn_error": "Connection error while uploading the file.",
+  "msg_waiting": "⏳ Waiting for processing to start...",
+  "msg_large_pdf": "Large PDF detected, please wait...",
+  "msg_conn_status": "Connection error. Reload the page to check.",
+  "msg_remove_error": "Error removing PDF.",
+  "msg_remove_conn": "Connection error while removing PDF.",
+  "msg_clear_error": "Error clearing database.",
+  "msg_clear_conn": "Connection error while clearing database.",
+  "msg_no_query": "Please type a question.",
+  "msg_no_pdf": "Upload at least one PDF before searching.",
+  "msg_searching": "Querying AI across all indexed PDFs...",
+  "msg_no_answer": "No answer found.",
+  "msg_search_error": "Search error. Please try again.",
+  "msg_load_error": "Error loading the PDF list.",
+  "msg_already_sent": "This file has already been uploaded.",
+  "msg_only_pdf": "Only PDF files are accepted.",
+
+  "status_processing": "Processing...",
+  "status_done": "Done",
+  "status_error": "Error"
+}

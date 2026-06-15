@@ -1,6 +1,7 @@
 import os
+import time
 from dotenv import load_dotenv
-from openai import OpenAI
+from openai import OpenAI, APIError
 from langdetect import detect_langs, LangDetectException
 
 load_dotenv()
@@ -13,18 +14,14 @@ Rules:
 - If the answer is not in the context, say you could not find it in the document.
 - Do not make up data.
 - Be direct and objective.
-- When it makes sense, quote excerpts from the context.
+- Always cite the source (filename and page number) of each piece of information you use.
 - If the context contains descriptions of images, charts or tables, use that information too.
 """
 
 
 def _detect_language(text: str) -> str:
-    """
-    Detecta o idioma com heurísticas para não errar português em frases curtas.
-    """
     try:
         lower = text.strip().lower()
-
         pt_keywords = [
             "qual", "quando", "como", "porque", "por que", "onde",
             "modelo", "contrato", "valor", "prazo", "cliente", "quais",
@@ -47,19 +44,28 @@ def _detect_language(text: str) -> str:
 
 
 def _build_context(results: list[dict]) -> str:
+    """
+    Monta o contexto com referência de arquivo e página para cada trecho.
+    """
     parts = []
     for i, r in enumerate(results, start=1):
-        txt      = r["metadata"]["text"]
-        filename = r["metadata"].get("filename", "desconhecido")
-        parts.append(f"[Trecho {i} | arquivo: {filename}]\n{txt}\n")
+        meta        = r["metadata"]
+        txt         = meta.get("text", "")
+        filename    = meta.get("filename", "desconhecido")
+        page_number = meta.get("page_number", "?")
+        chunk_type  = meta.get("chunk_type", "text")
+
+        if chunk_type == "image":
+            label = f"[Imagem | arquivo: {filename} | página: {page_number}]"
+        else:
+            label = f"[Trecho {i} | arquivo: {filename} | página: {page_number}]"
+
+        parts.append(f"{label}\n{txt}\n")
+
     return "\n\n".join(parts)
 
 
 def answer_with_rag(query: str, results: list[dict]) -> str:
-    """
-    Gera a resposta usando RAG.
-    O modelo infere o idioma diretamente do texto da pergunta.
-    """
     language      = _detect_language(query)
     LANG_MAP      = {
         "en":    "English",
@@ -85,12 +91,13 @@ USER QUESTION:
 
 DETECTED LANGUAGE (hint only, may be imperfect): {language_name}
 
-CONTEXT (text and image descriptions from the documents):
+CONTEXT (each block shows the source file and page number):
 {context}
 
 INSTRUCTIONS:
-- First, infer the language of the QUESTION directly from its text.
-- Answer STRICTLY in the SAME LANGUAGE as the QUESTION, regardless of the detected code shown above.
+- Infer the language of the QUESTION directly from its text.
+- Answer STRICTLY in the SAME LANGUAGE as the QUESTION.
+- For each piece of information used, cite the source in parentheses, like: (arquivo: nome.pdf, página: 3).
 - If the answer is not in the CONTEXT, say clearly that you could not find it in the documents.
 - Use image descriptions when they are relevant.
 """
@@ -107,15 +114,7 @@ INSTRUCTIONS:
     return completion.choices[0].message.content.strip()
 
 
-import time
-from openai import APIError
-# ... resto dos imports já existentes ...
-
 def generate_summary_and_topics(chunks: list[str], max_retries: int = 3) -> dict:
-    """
-    Gera resumo e tópicos do PDF.
-    Faz retry em caso de rate limit (429).
-    """
     sample = "\n\n".join(chunks[:20]) if chunks else ""
 
     if not sample.strip():
@@ -163,17 +162,16 @@ def generate_summary_and_topics(chunks: list[str], max_retries: int = 3) -> dict
         except APIError as e:
             if hasattr(e, "status") and e.status == 429:
                 wait_time = 2 * (attempt + 1)
-                print(f"[Summary] ⚠️ Rate limit ao gerar resumo. Tentando de novo em {wait_time}s...")
+                print(f"[Summary] ⚠️ Rate limit. Tentando de novo em {wait_time}s...")
                 time.sleep(wait_time)
                 attempt += 1
                 continue
             else:
-                print(f"[Summary] ❌ Erro ao gerar resumo: {e}")
+                print(f"[Summary] ❌ Erro: {e}")
                 return {"summary": "", "topics": []}
 
         except Exception as e:
-            print(f"[Summary] ❌ Erro inesperado ao gerar resumo: {e}")
+            print(f"[Summary] ❌ Erro inesperado: {e}")
             return {"summary": "", "topics": []}
 
-    print(f"[Summary] ❌ Falha após {max_retries} tentativas.")
     return {"summary": "", "topics": []}

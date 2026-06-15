@@ -10,121 +10,92 @@ load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
-def _encode_bytes_to_base64(image_bytes: bytes) -> str:
-    return base64.b64encode(image_bytes).decode("utf-8")
+def _encode_bytes(b: bytes) -> str:
+    return base64.b64encode(b).decode("utf-8")
 
 
-def _get_mime_from_ext(ext: str) -> str:
-    mime_map = {
+def _mime(ext: str) -> str:
+    return {
         "png":  "image/png",
         "jpg":  "image/jpeg",
         "jpeg": "image/jpeg",
         "gif":  "image/gif",
         "webp": "image/webp",
-    }
-    return mime_map.get(ext.lower(), "image/png")
+    }.get(ext.lower(), "image/png")
 
 
-def _describe_image_once(img_info: dict) -> str:
-    image_bytes = img_info.get("image_bytes", b"")
-    image_ext   = img_info.get("image_ext", "png")
-    image_name  = img_info.get("image_name", "imagem")
-
-    base64_image = _encode_bytes_to_base64(image_bytes)
-    mime_type    = _get_mime_from_ext(image_ext)
-
-    completion = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": (
-                            "Descreva esta imagem de forma detalhada e objetiva em português. "
-                            "Foque em dados, gráficos, tabelas, esquemas ou qualquer informação "
-                            "visual útil para responder perguntas sobre o documento. "
-                            "Se for gráfico, descreva valores e tendências. "
-                            "Se for tabela, descreva os dados. "
-                            "Se for figura ou diagrama, descreva os elementos e relações."
-                        ),
-                    },
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url":    f"data:{mime_type};base64,{base64_image}",
-                            "detail": "high",
-                        },
-                    },
-                ],
-            }
-        ],
-        temperature=0.0,
-        max_tokens=1000,
-    )
-
-    return completion.choices[0].message.content.strip()
-
-
-def describe_image(img_info: dict, max_retries: int = 3) -> dict | None:
+def _describe_one(img: dict, attempt: int = 0) -> dict | None:
     """
-    Descreve uma única imagem a partir dos bytes.
-    Faz retry em caso de erro 429 (rate limit).
+    Recebe um dict com image_bytes, image_ext, page_number, image_name.
+    Retorna o mesmo dict + campo 'caption'. None se falhar.
     """
-    image_bytes = img_info.get("image_bytes", b"")
-    image_name  = img_info.get("image_name", "imagem")
-
-    if len(image_bytes) < 1024:
-        print(f"[ImageCaption] Ignorando imagem pequena: {image_name}")
+    if len(img.get("image_bytes", b"")) < 1024:
+        print(f"[ImageCaption] Ignorando imagem pequena: {img.get('image_name')}")
         return None
 
-    attempt = 0
-    while attempt < max_retries:
-        try:
-            caption = _describe_image_once(img_info)
-            print(f"[ImageCaption] ✅ Descrita: {image_name}")
-            return {**img_info, "caption": caption}
+    base64_img = _encode_bytes(img["image_bytes"])
+    mime_type  = _mime(img["image_ext"])
 
-        except APIError as e:
-            # Erro de rate limit
-            if hasattr(e, "status") and e.status == 429:
-                wait_time = 2 * (attempt + 1)
-                print(f"[ImageCaption] ⚠️ Rate limit ao descrever {image_name}. Tentando de novo em {wait_time}s...")
-                time.sleep(wait_time)
-                attempt += 1
-                continue
-            else:
-                print(f"[ImageCaption] ❌ Erro em {image_name}: {e}")
-                return None
+    try:
+        completion = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": (
+                                "Descreva esta imagem de forma detalhada e objetiva em português. "
+                                "Inclua dados, gráficos, tabelas ou qualquer informação visual "
+                                "que possa ser útil para responder perguntas sobre o documento."
+                            ),
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url":    f"data:{mime_type};base64,{base64_img}",
+                                "detail": "high",
+                            },
+                        },
+                    ],
+                }
+            ],
+            temperature=0.0,
+            max_tokens=1000,
+        )
+        caption = completion.choices[0].message.content.strip()
+        print(f"[ImageCaption] ✅ Descrita: {img.get('image_name')}")
+        return {**img, "caption": caption}
 
-        except Exception as e:
-            print(f"[ImageCaption] ❌ Erro inesperado em {image_name}: {e}")
-            return None
+    except APIError as e:
+        if hasattr(e, "status") and e.status == 429 and attempt < 3:
+            wait = 2 * (attempt + 1)
+            print(f"[ImageCaption] ⚠️ Rate limit em {img.get('image_name')}. Aguardando {wait}s...")
+            time.sleep(wait)
+            return _describe_one(img, attempt + 1)
+        print(f"[ImageCaption] ❌ Erro em {img.get('image_name')}: {e}")
+        return None
 
-    print(f"[ImageCaption] ❌ Falha após {max_retries} tentativas em {image_name}")
-    return None
+    except Exception as e:
+        print(f"[ImageCaption] ❌ Erro inesperado em {img.get('image_name')}: {e}")
+        return None
 
 
 def describe_images_bulk(images: List[Dict], max_workers: int = 3) -> List[Dict]:
     """
-    Descreve todas as imagens em paralelo usando ThreadPoolExecutor.
-    max_workers foi reduzido para 3 para diminuir a chance de estourar o limite.
+    Processa as imagens em paralelo e devolve apenas as descritas com sucesso.
     """
     if not images:
         return []
 
     results = []
-
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {
-            executor.submit(describe_image, img_info): img_info
-            for img_info in images
-        }
-        for future in as_completed(futures):
-            result = future.result()
-            if result is not None:
-                results.append(result)
+        futures = {executor.submit(_describe_one, img): img for img in images}
+        for f in as_completed(futures):
+            r = f.result()
+            if r:
+                results.append(r)
 
     results.sort(key=lambda x: x["page_number"])
     return results
