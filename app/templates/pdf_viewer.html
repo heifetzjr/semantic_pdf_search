@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ filename }} — Página {{ page }}</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        body {
+            background: #1a1a2e;
+            color:       #fff;
+            display:     flex;
+            flex-direction: column;
+            min-height:  100vh;
+            margin:      0;
+        }
+
+        .viewer-header {
+            background:  linear-gradient(135deg, #2b6cb0 0%, #1a365d 100%);
+            padding:     0.75rem 1.5rem;
+            display:     flex;
+            align-items: center;
+            justify-content: space-between;
+            gap:         1rem;
+            flex-wrap:   wrap;
+            box-shadow:  0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        .viewer-header h2 {
+            font-size:   1rem;
+            font-weight: 600;
+            color:       #fff;
+            margin:      0;
+            flex:        1;
+            white-space: nowrap;
+            overflow:    hidden;
+            text-overflow: ellipsis;
+        }
+
+        .viewer-controls {
+            display:     flex;
+            align-items: center;
+            gap:         0.75rem;
+            flex-wrap:   wrap;
+        }
+
+        .viewer-controls button {
+            background:    rgba(255,255,255,0.15);
+            border:        1px solid rgba(255,255,255,0.3);
+            color:         #fff;
+            border-radius: 6px;
+            padding:       0.35rem 0.8rem;
+            font-size:     0.85rem;
+            cursor:        pointer;
+            transition:    background 0.2s;
+        }
+
+        .viewer-controls button:hover {
+            background: rgba(255,255,255,0.28);
+        }
+
+        .viewer-controls button:disabled {
+            opacity: 0.4;
+            cursor:  not-allowed;
+        }
+
+        #pageInfo {
+            font-size:  0.88rem;
+            color:      rgba(255,255,255,0.85);
+            min-width:  80px;
+            text-align: center;
+        }
+
+        .btn-back {
+            background:    rgba(255,255,255,0.1);
+            border:        1px solid rgba(255,255,255,0.25);
+            color:         rgba(255,255,255,0.8);
+            border-radius: 6px;
+            padding:       0.35rem 0.8rem;
+            font-size:     0.85rem;
+            cursor:        pointer;
+            text-decoration: none;
+            display:       inline-flex;
+            align-items:   center;
+            gap:           0.3rem;
+            transition:    background 0.2s;
+        }
+
+        .btn-back:hover {
+            background: rgba(255,255,255,0.2);
+            color:      #fff;
+        }
+
+        .btn-download {
+            background:    #38a169;
+            border:        none;
+            color:         #fff;
+            border-radius: 6px;
+            padding:       0.35rem 0.9rem;
+            font-size:     0.85rem;
+            font-weight:   600;
+            cursor:        pointer;
+            text-decoration: none;
+            display:       inline-flex;
+            align-items:   center;
+            gap:           0.35rem;
+            transition:    background 0.2s;
+        }
+
+        .btn-download:hover {
+            background: #2f855a;
+        }
+
+        .viewer-body {
+            flex:       1;
+            display:    flex;
+            align-items: flex-start;
+            justify-content: center;
+            padding:    1.5rem;
+            overflow-y: auto;
+        }
+
+        #pdfCanvas {
+            max-width:  100%;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+            border-radius: 4px;
+        }
+
+        .viewer-loading {
+            display:     flex;
+            align-items: center;
+            gap:         0.75rem;
+            color:       rgba(255,255,255,0.7);
+            font-size:   0.95rem;
+            margin-top:  3rem;
+        }
+
+        .viewer-error {
+            color:       #fc8181;
+            font-size:   0.95rem;
+            margin-top:  3rem;
+            text-align:  center;
+        }
+    </style>
+</head>
+<body>
+
+<div class="viewer-header">
+    <a href="/" class="btn-back">← Voltar</a>
+    <h2>📄 {{ filename }}</h2>
+
+    <div class="viewer-controls">
+        <button id="btnPrev" onclick="changePage(-1)">◀ Anterior</button>
+        <span id="pageInfo">Página {{ page }}</span>
+        <button id="btnNext" onclick="changePage(1)">Próxima ▶</button>
+    </div>
+
+    <a href="/pdf-file/{{ file_id }}" download="{{ filename }}" class="btn-download">
+        ⬇ Download
+    </a>
+</div>
+
+<div class="viewer-body">
+    <div id="loadingMsg" class="viewer-loading">
+        <div class="spinner" style="border-color:#444;border-top-color:#fff;"></div>
+        Carregando PDF...
+    </div>
+    <div id="errorMsg"   class="viewer-error hidden"></div>
+    <canvas id="pdfCanvas" class="hidden"></canvas>
+</div>
+
+<!-- PDF.js via CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+        "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+    const PDF_URL    = "{{ pdf_url }}";
+    const INIT_PAGE  = {{ page }};
+
+    let pdfDoc      = null;
+    let currentPage = INIT_PAGE;
+    let totalPages  = 0;
+
+    const canvas      = document.getElementById("pdfCanvas");
+    const ctx         = canvas.getContext("2d");
+    const loadingMsg  = document.getElementById("loadingMsg");
+    const errorMsg    = document.getElementById("errorMsg");
+    const pageInfo    = document.getElementById("pageInfo");
+    const btnPrev     = document.getElementById("btnPrev");
+    const btnNext     = document.getElementById("btnNext");
+
+    function updateControls() {
+        pageInfo.textContent = `Página ${currentPage} / ${totalPages}`;
+        btnPrev.disabled = currentPage <= 1;
+        btnNext.disabled = currentPage >= totalPages;
+        // Atualiza a URL sem recarregar a página
+        history.replaceState(null, "", `/pdf-viewer/{{ file_id }}?page=${currentPage}`);
+    }
+
+    async function renderPage(num) {
+        const page     = await pdfDoc.getPage(num);
+        const viewport = page.getViewport({ scale: 1.5 });
+
+        canvas.width  = viewport.width;
+        canvas.height = viewport.height;
+
+        await page.render({ canvasContext: ctx, viewport }).promise;
+
+        loadingMsg.classList.add("hidden");
+        canvas.classList.remove("hidden");
+        updateControls();
+    }
+
+    function changePage(delta) {
+        const next = currentPage + delta;
+        if (next < 1 || next > totalPages) return;
+        currentPage = next;
+        renderPage(currentPage);
+    }
+
+    // Navega com setas do teclado
+    document.addEventListener("keydown", e => {
+        if (e.key === "ArrowRight" || e.key === "ArrowDown") changePage(1);
+        if (e.key === "ArrowLeft"  || e.key === "ArrowUp")   changePage(-1);
+    });
+
+    // Carrega o PDF
+    pdfjsLib.getDocument(PDF_URL).promise
+        .then(doc => {
+            pdfDoc     = doc;
+            totalPages = doc.numPages;
+            currentPage = Math.min(Math.max(INIT_PAGE, 1), totalPages);
+            renderPage(currentPage);
+        })
+        .catch(err => {
+            loadingMsg.classList.add("hidden");
+            errorMsg.classList.remove("hidden");
+            errorMsg.textContent = `Erro ao carregar o PDF: ${err.message}`;
+        });
+</script>
+</body>
+</html>

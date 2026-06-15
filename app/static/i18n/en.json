@@ -7,6 +7,8 @@
   "step1_hint": "The system extracts text and images automatically. Each PDF is added to the database without removing the previous ones.",
   "upload_btn": "Upload",
   "file_input_label": "Select a PDF file",
+  "choose_file": "📂 Choose file",
+  "no_file_chosen": "No file chosen",
 
   "pdfs_label": "Indexed PDFs:",
   "clear_all": "🧹 Clear all",
@@ -48,5 +50,10 @@
 
   "status_processing": "Processing...",
   "status_done": "Done",
-  "status_error": "Error"
+  "status_error": "Error",
+
+  "open_pdf_title":   "Open {filename}",
+  "sources_label":    "📚 Sources:",
+  "page_label":       "Page",
+  "open_page_title":  "Open {filename} at page {page}"
 }

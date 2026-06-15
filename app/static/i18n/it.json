@@ -7,6 +7,8 @@
   "step1_hint": "Il sistema estrae automaticamente testo e immagini. Ogni PDF viene aggiunto al database senza sovrascrivere i precedenti.",
   "upload_btn": "Carica",
   "file_input_label": "Seleziona un file PDF",
+  "choose_file": "📂 Scegli file",
+  "no_file_chosen": "Nessun file selezionato",
 
   "pdfs_label": "PDF indicizzati:",
   "clear_all": "🧹 Cancella tutto",
@@ -48,5 +50,10 @@
 
   "status_processing": "Elaborazione...",
   "status_done": "Completato",
-  "status_error": "Errore"
+  "status_error": "Errore",
+
+  "open_pdf_title":   "Apri {filename}",
+  "sources_label":    "📚 Fonti consultate:",
+  "page_label":       "Pagina",
+  "open_page_title":  "Apri {filename} a pagina {page}"
 }

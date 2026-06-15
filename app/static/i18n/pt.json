@@ -7,6 +7,8 @@
   "step1_hint": "O sistema extrai texto e imagens automaticamente. Cada PDF é adicionado ao banco sem apagar os anteriores.",
   "upload_btn": "Enviar",
   "file_input_label": "Selecione um arquivo PDF",
+  "choose_file": "📂 Escolher arquivo",
+  "no_file_chosen": "Nenhum arquivo selecionado",
 
   "pdfs_label": "PDFs indexados:",
   "clear_all": "🧹 Limpar tudo",
@@ -48,5 +50,10 @@
 
   "status_processing": "Processando...",
   "status_done": "Concluído",
-  "status_error": "Erro"
+  "status_error": "Erro",
+
+  "open_pdf_title":   "Abrir {filename}",
+  "sources_label":    "📚 Fontes consultadas:",
+  "page_label":       "Página",
+  "open_page_title":  "Abrir {filename} na página {page}"
 }

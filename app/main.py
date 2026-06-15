@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request, BackgroundTasks
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
@@ -22,19 +22,21 @@ from app.services.vector_store_service import (
 )
 from app.services.llm_service import answer_with_rag, generate_summary_and_topics
 
-# ── Configuração da aplicação ────────────────────────────────────────
+# ── Configuração ─────────────────────────────────────────────────────
 app = FastAPI(title="Busca Semântica em PDFs")
 
-templates = Jinja2Templates(directory="app/templates")
+templates  = Jinja2Templates(directory="app/templates")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 HISTORY_FILE = Path("history.json")
 I18N_DIR     = Path("app/static/i18n")
+UPLOADS_DIR  = Path("app/static/uploads")
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
-# ── Inicializa o banco vetorial (singleton) ──────────────────────────
+# ── Singleton Qdrant ─────────────────────────────────────────────────
 init_vector_store()
 
-# ── Estado de uploads em andamento ──────────────────────────────────
+# ── Estado de uploads ────────────────────────────────────────────────
 upload_status: dict[str, dict] = {}
 
 
@@ -59,27 +61,16 @@ def save_history(history: list[dict]):
 # ════════════════════════════════════════════════════════════════════
 
 def process_pdf_background(file_id: str, file_bytes: bytes, filename: str):
-    """
-    Pipeline completo de indexação de um PDF:
-    1. Extrai texto e imagens
-    2. Descreve imagens via IA
-    3. Gera resumo e tópicos
-    4. Gera embeddings
-    5. Indexa no Qdrant
-    6. Salva no histórico
-    """
     upload_status[file_id] = {
         "status":  "processando",
         "message": f"Extraindo texto e imagens de '{filename}'...",
     }
 
     try:
-        # 1. Extração
         print(f"[Upload] Extraindo conteúdo de '{filename}'...")
         extracted = extract_text_and_images(file_bytes, filename)
         pages     = extracted["pages"]
         images    = extracted["images"]
-
         print(f"[Upload] {len(pages)} página(s) | {len(images)} imagem(ns) encontrada(s).")
 
         all_text = "\n\n".join(p["text"] for p in pages if p["text"].strip())
@@ -91,7 +82,7 @@ def process_pdf_background(file_id: str, file_bytes: bytes, filename: str):
             }
             return
 
-        # 2. Descrição de imagens
+        # Descrição de imagens
         described_images = []
         if images:
             upload_status[file_id]["message"] = (
@@ -101,27 +92,25 @@ def process_pdf_background(file_id: str, file_bytes: bytes, filename: str):
             described_images = describe_images_bulk(images)
             print(f"[Upload] {len(described_images)} imagem(ns) descritas.")
 
-        # 3. Monta chunks com page_number
+        # Monta chunks
         upload_status[file_id]["message"] = "Preparando trechos para indexação..."
 
         chunks:       list[str] = []
         chunk_types:  list[str] = []
         page_numbers: list[int] = []
 
-        # Chunks de texto — preserva número da página
         for page in pages:
             if not page["text"].strip():
                 continue
-            page_chunks = [c.strip() for c in page["text"].split("\n\n") if c.strip()]
-            for chunk in page_chunks:
+            for chunk in [c.strip() for c in page["text"].split("\n\n") if c.strip()]:
                 chunks.append(chunk)
                 chunk_types.append("text")
                 page_numbers.append(page["page_number"])
 
-        # Chunks de imagens
         for img in described_images:
-            caption_text = f"[Imagem na página {img['page_number']}]\n{img['caption']}"
-            chunks.append(caption_text)
+            chunks.append(
+                f"[Imagem na página {img['page_number']}]\n{img['caption']}"
+            )
             chunk_types.append("image")
             page_numbers.append(img["page_number"])
 
@@ -134,14 +123,12 @@ def process_pdf_background(file_id: str, file_bytes: bytes, filename: str):
 
         print(f"[Upload] Total de chunks: {len(chunks)}.")
 
-        # 4. Resumo e tópicos
+        # Resumo e tópicos
         upload_status[file_id]["message"] = "Gerando resumo e tópicos..."
-        text_only_chunks = [c for c, t in zip(chunks, chunk_types) if t == "text"]
-        meta_doc         = generate_summary_and_topics(text_only_chunks)
-        print(f"[Upload] Resumo: {meta_doc['summary']}")
-        print(f"[Upload] Tópicos: {meta_doc['topics']}")
+        text_chunks = [c for c, tp in zip(chunks, chunk_types) if tp == "text"]
+        meta_doc    = generate_summary_and_topics(text_chunks)
 
-        # 5. Embeddings
+        # Embeddings
         upload_status[file_id]["message"] = (
             f"Gerando embeddings para {len(chunks)} trechos..."
         )
@@ -149,7 +136,7 @@ def process_pdf_background(file_id: str, file_bytes: bytes, filename: str):
         embeddings = get_embeddings(chunks)
         print(f"[Upload] Embeddings gerados.")
 
-        # 6. Indexação no Qdrant
+        # Indexação
         upload_status[file_id]["message"] = "Indexando no banco vetorial..."
         print(f"[Upload] Indexando no Qdrant...")
 
@@ -168,7 +155,7 @@ def process_pdf_background(file_id: str, file_bytes: bytes, filename: str):
         add_documents(get_client(), embeddings, docs_metadata)
         print(f"[Upload] Indexação concluída.")
 
-        # 7. Histórico
+        # Histórico
         n_text  = chunk_types.count("text")
         n_image = chunk_types.count("image")
 
@@ -209,7 +196,7 @@ def process_pdf_background(file_id: str, file_bytes: bytes, filename: str):
 
 
 # ════════════════════════════════════════════════════════════════════
-# Rotas — interface
+# Rotas — interface principal
 # ════════════════════════════════════════════════════════════════════
 
 @app.get("/", response_class=HTMLResponse)
@@ -218,16 +205,56 @@ async def read_root(request: Request):
 
 
 # ════════════════════════════════════════════════════════════════════
-# Rotas — i18n
+# Visualizador de PDF
+# ════════════════════════════════════════════════════════════════════
+
+@app.get("/pdf-viewer/{file_id}", response_class=HTMLResponse)
+async def pdf_viewer(request: Request, file_id: str, page: int = 1):
+    history = load_history()
+    item    = next((p for p in history if p["file_id"] == file_id), None)
+
+    if not item:
+        raise HTTPException(status_code=404, detail="PDF não encontrado.")
+
+    pdf_path = UPLOADS_DIR / f"{file_id}.pdf"
+    if not pdf_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="Arquivo PDF não encontrado no servidor.",
+        )
+
+    return templates.TemplateResponse("pdf_viewer.html", {
+        "request":  request,
+        "file_id":  file_id,
+        "filename": item["filename"],
+        "page":     page,
+        "pdf_url":  f"/pdf-file/{file_id}",
+    })
+
+
+@app.get("/pdf-file/{file_id}")
+async def serve_pdf(file_id: str):
+    pdf_path = UPLOADS_DIR / f"{file_id}.pdf"
+    if not pdf_path.exists():
+        raise HTTPException(status_code=404, detail="Arquivo não encontrado.")
+
+    history  = load_history()
+    item     = next((p for p in history if p["file_id"] == file_id), None)
+    filename = item["filename"] if item else f"{file_id}.pdf"
+
+    return FileResponse(
+        path=pdf_path,
+        media_type="application/pdf",
+        filename=filename,
+    )
+
+
+# ════════════════════════════════════════════════════════════════════
+# i18n
 # ════════════════════════════════════════════════════════════════════
 
 @app.get("/languages")
 async def list_languages():
-    """
-    Lê dinamicamente a pasta i18n/ e devolve a lista de idiomas disponíveis.
-    O arquivo _labels.json é excluído da lista (é apenas configuração visual).
-    Qualquer novo .json adicionado à pasta aparece automaticamente.
-    """
     if not I18N_DIR.exists():
         return JSONResponse({"languages": []})
 
@@ -242,7 +269,7 @@ async def list_languages():
 
 
 # ════════════════════════════════════════════════════════════════════
-# Rotas — upload
+# Upload
 # ════════════════════════════════════════════════════════════════════
 
 @app.post("/upload")
@@ -265,6 +292,11 @@ async def upload_pdf(
 
     file_bytes = await file.read()
     file_id    = uuid.uuid4().hex
+
+    # Salva o PDF fisicamente
+    pdf_path = UPLOADS_DIR / f"{file_id}.pdf"
+    pdf_path.write_bytes(file_bytes)
+    print(f"[Upload] 💾 PDF salvo em: {pdf_path}")
 
     upload_status[file_id] = {
         "status":  "processando",
@@ -295,7 +327,7 @@ async def get_upload_status(file_id: str):
 
 
 # ════════════════════════════════════════════════════════════════════
-# Rotas — listagem e remoção de PDFs
+# Listagem e remoção de PDFs
 # ════════════════════════════════════════════════════════════════════
 
 @app.get("/pdfs")
@@ -312,12 +344,17 @@ async def delete_pdf(file_id: str):
         raise HTTPException(status_code=404, detail="PDF não encontrado.")
 
     delete_documents_by_file(get_client(), file_id)
-    upload_status.pop(file_id, None)
 
+    pdf_path = UPLOADS_DIR / f"{file_id}.pdf"
+    if pdf_path.exists():
+        pdf_path.unlink()
+        print(f"[Delete] 🗑️ Arquivo físico removido: {pdf_path}")
+
+    upload_status.pop(file_id, None)
     history = [p for p in history if p["file_id"] != file_id]
     save_history(history)
 
-    print(f"[Delete] ✅ '{item['filename']}' removido do Qdrant.")
+    print(f"[Delete] ✅ '{item['filename']}' removido.")
 
     return JSONResponse({
         "message": f"🗑️ '{item['filename']}' removido com sucesso.",
@@ -326,15 +363,15 @@ async def delete_pdf(file_id: str):
 
 @app.delete("/clear-all")
 async def clear_all():
-    """
-    Limpa toda a coleção do Qdrant e reinicia o histórico.
-    Usa o singleton — NÃO cria nova instância do cliente.
-    """
+    for pdf_file in UPLOADS_DIR.glob("*.pdf"):
+        pdf_file.unlink()
+        print(f"[ClearAll] 🗑️ Arquivo removido: {pdf_file.name}")
+
     clear_vector_store()
     upload_status.clear()
     save_history([])
 
-    print("[ClearAll] ✅ Banco vetorial e histórico limpos.")
+    print("[ClearAll] ✅ Banco vetorial, arquivos e histórico limpos.")
 
     return JSONResponse({
         "message": "🧹 Banco vetorial limpo com sucesso.",
@@ -342,7 +379,7 @@ async def clear_all():
 
 
 # ════════════════════════════════════════════════════════════════════
-# Rotas — busca semântica
+# Busca semântica — com sources para [CIT-n]
 # ════════════════════════════════════════════════════════════════════
 
 @app.post("/search")
@@ -365,13 +402,30 @@ async def semantic_search(
 
     if not results:
         return JSONResponse({
-            "query":  query,
-            "answer": "Não encontrei informações relevantes nos documentos.",
+            "query":   query,
+            "answer":  "Não encontrei informações relevantes nos documentos.",
+            "sources": [],
         })
 
     answer = answer_with_rag(query, results)
 
+    # sources alinhadas com [CIT-1], [CIT-2]...
+    sources = []
+    for idx, r in enumerate(results, start=1):
+        meta    = r["metadata"]
+        file_id = meta.get("file_id", "")
+        if not file_id:
+            continue
+        sources.append({
+            "citation": f"CIT-{idx}",
+            "file_id":  file_id,
+            "filename": meta.get("filename", ""),
+            "page":     meta.get("page_number", 1),
+            "url":      f"/pdf-viewer/{file_id}?page={meta.get('page_number', 1)}",
+        })
+
     return JSONResponse({
-        "query":  query,
-        "answer": answer,
+        "query":   query,
+        "answer":  answer,
+        "sources": sources,
     })

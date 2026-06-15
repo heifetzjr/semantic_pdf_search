@@ -29,11 +29,25 @@
 
             <form id="uploadForm">
                 <div class="form-row">
-                    <input type="file" id="fileInput" accept=".pdf" required data-i18n-title="file_input_label"
-                        title="Selecione um arquivo PDF">
+
+                    <!-- Input nativo escondido, sem nada em volta -->
+                    <input type="file" id="fileInput" name="file" accept=".pdf" required>
+
+                    <!-- Nosso botão customizado -->
+                    <button type="button" id="chooseFileBtn" class="btn" data-i18n="choose_file">
+                        📂 Escolher arquivo
+                    </button>
+
+                    <!-- Nome do arquivo -->
+                    <span id="fileNameDisplay" class="file-name-display">
+                        Nenhum arquivo selecionado
+                    </span>
+
+                    <!-- Enviar -->
                     <button type="submit" id="uploadBtn" data-i18n="upload_btn">
                         Enviar
                     </button>
+
                 </div>
             </form>
 

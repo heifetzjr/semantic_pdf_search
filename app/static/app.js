@@ -6,7 +6,6 @@ const LANG_KEY = "selectedLang";
 let currentTranslations = {};
 let langLabels          = {};
 
-
 async function fetchLangLabels() {
     try {
         const resp = await fetch("/static/i18n/_labels.json");
@@ -26,7 +25,7 @@ async function loadTranslations(lang) {
         if (!resp.ok) throw new Error(`Falha ao carregar ${lang}.json`);
         currentTranslations = await resp.json();
     } catch (err) {
-        console.error("[i18n] Erro ao carregar traduções:", err);
+        console.error("[i18n] Erro:", err);
         if (lang !== "pt") await loadTranslations("pt");
     }
 }
@@ -40,7 +39,6 @@ function t(key, vars = {}) {
 }
 
 function applyTranslations() {
-    // textContent
     document.querySelectorAll("[data-i18n]").forEach(el => {
         const key = el.getAttribute("data-i18n");
         if (currentTranslations[key] !== undefined) {
@@ -48,7 +46,6 @@ function applyTranslations() {
         }
     });
 
-    // placeholder
     document.querySelectorAll("[data-i18n-placeholder]").forEach(el => {
         const key = el.getAttribute("data-i18n-placeholder");
         if (currentTranslations[key] !== undefined) {
@@ -56,7 +53,6 @@ function applyTranslations() {
         }
     });
 
-    // title
     document.querySelectorAll("[data-i18n-title]").forEach(el => {
         const key = el.getAttribute("data-i18n-title");
         if (currentTranslations[key] !== undefined) {
@@ -64,20 +60,24 @@ function applyTranslations() {
         }
     });
 
-    // page title (<title>)
     const titleEl = document.querySelector("title[data-i18n]");
     if (titleEl) {
         const key = titleEl.getAttribute("data-i18n");
         if (currentTranslations[key]) document.title = currentTranslations[key];
     }
 
-    // botão ativo no seletor
     const current = getCurrentLang();
     document.querySelectorAll(".lang-btn").forEach(btn => {
         btn.classList.toggle("lang-btn--active", btn.dataset.lang === current);
     });
 
-    // rerenderiza lista de PDFs (textos dinâmicos)
+    const fileInput       = document.getElementById("fileInput");
+    const fileNameDisplay = document.getElementById("fileNameDisplay");
+    if (fileNameDisplay && (!fileInput || !fileInput.files.length)) {
+        fileNameDisplay.textContent = t("no_file_chosen");
+        fileNameDisplay.classList.remove("file-name--chosen");
+    }
+
     renderPdfList();
 }
 
@@ -115,10 +115,10 @@ async function initLanguageSelector() {
     languages.forEach(({ code }) => {
         const li  = document.createElement("li");
         const btn = document.createElement("button");
-        btn.type              = "button";
-        btn.className         = "lang-btn" + (code === current ? " lang-btn--active" : "");
-        btn.dataset.lang      = code;
-        btn.textContent       = getLangLabel(code);
+        btn.type         = "button";
+        btn.className    = "lang-btn" + (code === current ? " lang-btn--active" : "");
+        btn.dataset.lang = code;
+        btn.textContent  = getLangLabel(code);
         btn.setAttribute("aria-label", `Switch language to ${code}`);
         btn.addEventListener("click", () => setLanguage(code));
         li.appendChild(btn);
@@ -130,6 +130,57 @@ async function initLanguageSelector() {
 
 
 // ════════════════════════════════════════════════════════════════════
+// Input de arquivo customizado
+// ════════════════════════════════════════════════════════════════════
+
+function initFileInput() {
+    const chooseFileBtn   = document.getElementById("chooseFileBtn");
+    const fileInput       = document.getElementById("fileInput");
+    const fileNameDisplay = document.getElementById("fileNameDisplay");
+
+    if (!chooseFileBtn || !fileInput || !fileNameDisplay) return;
+
+    // ── Força esconder o input nativo via JS também ──────────────────
+    // Cobre casos onde o CSS não foi carregado ou foi sobrescrito
+    fileInput.style.cssText = [
+        "display: none !important",
+        "position: absolute !important",
+        "width: 0 !important",
+        "height: 0 !important",
+        "opacity: 0 !important",
+        "pointer-events: none !important",
+    ].join(";");
+
+    chooseFileBtn.addEventListener("click", () => {
+        fileInput.value = "";
+        fileNameDisplay.textContent = t("no_file_chosen");
+        fileNameDisplay.classList.remove("file-name--chosen");
+        fileInput.click();
+    });
+
+    fileInput.addEventListener("change", () => {
+        if (fileInput.files.length > 0) {
+            fileNameDisplay.textContent = fileInput.files[0].name;
+            fileNameDisplay.classList.add("file-name--chosen");
+        } else {
+            fileNameDisplay.textContent = t("no_file_chosen");
+            fileNameDisplay.classList.remove("file-name--chosen");
+        }
+    });
+}
+
+function resetFileInput() {
+    const fileInput       = document.getElementById("fileInput");
+    const fileNameDisplay = document.getElementById("fileNameDisplay");
+    if (fileInput)       fileInput.value = "";
+    if (fileNameDisplay) {
+        fileNameDisplay.textContent = t("no_file_chosen");
+        fileNameDisplay.classList.remove("file-name--chosen");
+    }
+}
+
+
+// ════════════════════════════════════════════════════════════════════
 // Estado global
 // ════════════════════════════════════════════════════════════════════
 
@@ -137,7 +188,7 @@ let uploadedPdfs = [];
 
 
 // ════════════════════════════════════════════════════════════════════
-// Alerta personalizado
+// Alertas
 // ════════════════════════════════════════════════════════════════════
 
 function showAlert(message, onConfirm) {
@@ -161,6 +212,7 @@ function showAlert(message, onConfirm) {
         overlay.classList.add("hidden");
         onConfirm();
     });
+
     document.getElementById("alertCancel").addEventListener("click", () => {
         overlay.classList.add("hidden");
     });
@@ -172,12 +224,12 @@ document.getElementById("alertOverlay").addEventListener("click", function(e) {
 
 
 // ════════════════════════════════════════════════════════════════════
-// Mensagem de feedback
+// Mensagens
 // ════════════════════════════════════════════════════════════════════
 
 function showMsg(text, type) {
-    const msgEl       = document.getElementById("uploadMsg");
-    msgEl.className   = `msg ${type}`;
+    const msgEl     = document.getElementById("uploadMsg");
+    msgEl.className = `msg ${type}`;
     msgEl.textContent = text;
 }
 
@@ -238,7 +290,13 @@ function renderPdfList() {
             <div class="pdf-info">
                 <div class="pdf-header">
                     <span class="pdf-icon">📎</span>
-                    <strong class="pdf-name">${pdf.filename}</strong>
+                    <a
+                        href="/pdf-viewer/${pdf.file_id}?page=1"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="pdf-name-link"
+                        title="${t("open_pdf_title", { filename: pdf.filename })}"
+                    >${pdf.filename}</a>
                     <span class="pdf-meta">
                         ${pdf.text_chunks || 0} ${t("label_text")} · ${pdf.image_chunks || 0} ${t("label_img")}
                     </span>
@@ -252,9 +310,7 @@ function renderPdfList() {
                 data-name="${pdf.filename}"
                 title="${t("remove_title")}"
                 aria-label="${t("remove_title")}"
-            >
-                🗑️
-            </button>
+            >🗑️</button>
         `;
         list.appendChild(li);
     });
@@ -266,7 +322,95 @@ function renderPdfList() {
 
 
 // ════════════════════════════════════════════════════════════════════
-// Upload com polling de status
+// Renderizar resposta com links inline [CIT-N]
+// ════════════════════════════════════════════════════════════════════
+
+function escapeHtml(str) {
+    return str
+        .replaceAll("&",  "&")
+        .replaceAll("<",  "<")
+        .replaceAll(">",  ">")
+        .replaceAll('"',  "&quot;")
+        .replaceAll("'",  "&#039;");
+}
+
+function renderAnswerWithInlineLinks(answer, sources) {
+    let html = escapeHtml(answer);
+
+    // Converte quebras de linha em <br>
+    html = html.replaceAll("\n", "<br>");
+
+    // Substitui cada [CIT-N] por um link clicável inline
+    (sources || []).forEach(src => {
+        const num      = src.citation.replace("CIT-", "");
+        const marker   = `[CIT-${num}]`;
+        const escaped  = escapeHtml(marker);
+        const filename = escapeHtml(src.filename);
+        const title    = `${filename} — ${t("page_label")} ${src.page}`;
+        const link     = `<a href="${src.url}" target="_blank" rel="noopener noreferrer" class="inline-citation" title="${title}">${escaped}</a>`;
+        html = html.replaceAll(escaped, link);
+    });
+
+    return html;
+}
+
+
+// ════════════════════════════════════════════════════════════════════
+// Persistir e restaurar o último resultado de busca
+// ════════════════════════════════════════════════════════════════════
+
+const LAST_RESULT_KEY = "lastSearchResult";
+
+function saveLastResult(data) {
+    try {
+        localStorage.setItem(LAST_RESULT_KEY, JSON.stringify(data));
+    } catch (e) {
+        console.warn("[Search] Não foi possível salvar resultado:", e);
+    }
+}
+
+function clearLastResult() {
+    localStorage.removeItem(LAST_RESULT_KEY);
+}
+
+function restoreLastResult() {
+    const saved = localStorage.getItem(LAST_RESULT_KEY);
+    if (!saved) return;
+
+    try {
+        const data      = JSON.parse(saved);
+        const container = document.getElementById("searchResults");
+        if (!container || !data.answer) return;
+
+        container.innerHTML = "";
+
+        // Restaura o campo de busca com a última query
+        const queryInput = document.getElementById("queryInput");
+        if (queryInput && data.query) {
+            queryInput.value = data.query;
+        }
+
+        const answerDiv     = document.createElement("div");
+        answerDiv.className = "result-item result-item--restored";
+
+        answerDiv.innerHTML = `
+            <div class="restored-badge">${t("restored_label") || "🔁 Resultado anterior"}</div>
+            <div class="answer-text">
+                ${renderAnswerWithInlineLinks(data.answer, data.sources || [])}
+            </div>
+        `;
+
+        container.appendChild(answerDiv);
+
+    } catch (e) {
+        console.error("[Search] Erro ao restaurar resultado:", e);
+        clearLastResult();
+    }
+}
+
+
+// ════════════════════════════════════════════════════════════════════
+// Upload
 // ════════════════════════════════════════════════════════════════════
 
 document.getElementById("uploadForm").addEventListener("submit", async function(e) {
@@ -291,7 +435,6 @@ document.getElementById("uploadForm").addEventListener("submit", async function(
         const json = await resp.json();
 
         if (!resp.ok) {
-            // Tenta mapear mensagens do backend para chaves de tradução
             const detail = json.detail || "";
             if (detail.includes("já foi enviado")) {
                 showMsg(t("msg_already_sent"), "error");
@@ -304,7 +447,7 @@ document.getElementById("uploadForm").addEventListener("submit", async function(
             return;
         }
 
-        fileInput.value = "";
+        resetFileInput();
         await pollUploadStatus(json.file_id, json.filename);
 
     } catch (err) {
@@ -366,10 +509,7 @@ async function pollUploadStatus(fileId, filename) {
                 }
 
                 if (tries === WARN_AFTER) {
-                    showMsg(
-                        `⏳ ${json.message} (${tempo}) — ${t("msg_large_pdf")}`,
-                        "info"
-                    );
+                    showMsg(`⏳ ${json.message} (${tempo}) — ${t("msg_large_pdf")}`, "info");
                     return;
                 }
 
@@ -388,7 +528,7 @@ async function pollUploadStatus(fileId, filename) {
 
 
 // ════════════════════════════════════════════════════════════════════
-// Excluir PDF individual
+// Excluir PDF
 // ════════════════════════════════════════════════════════════════════
 
 function deletePdf(fileId, filename) {
@@ -430,6 +570,10 @@ document.getElementById("clearAllBtn").addEventListener("click", function() {
                     uploadedPdfs = [];
                     renderPdfList();
                     document.getElementById("searchResults").innerHTML = "";
+
+                    // Limpa o resultado salvo também
+                    clearLastResult();
+
                     showMsg(json.message, "success");
                 } else {
                     showMsg(json.detail || t("msg_clear_error"), "error");
@@ -443,7 +587,7 @@ document.getElementById("clearAllBtn").addEventListener("click", function() {
 
 
 // ════════════════════════════════════════════════════════════════════
-// Busca
+// Busca — resposta com [CIT-N] inline + persistência
 // ════════════════════════════════════════════════════════════════════
 
 document.getElementById("searchForm").addEventListener("submit", async function(e) {
@@ -479,9 +623,26 @@ document.getElementById("searchForm").addEventListener("submit", async function(
         const json = await resp.json();
 
         container.innerHTML = "";
+
+        // Salva no localStorage para restaurar ao voltar do PDF
+        saveLastResult({
+            query:   json.query   || query,
+            answer:  json.answer  || "",
+            sources: json.sources || [],
+        });
+
         const answerDiv     = document.createElement("div");
         answerDiv.className = "result-item";
-        answerDiv.innerHTML = `<p class="text">${json.answer || t("msg_no_answer")}</p>`;
+
+        answerDiv.innerHTML = `
+            <div class="answer-text">
+                ${renderAnswerWithInlineLinks(
+                    json.answer || t("msg_no_answer"),
+                    json.sources || []
+                )}
+            </div>
+        `;
+
         container.appendChild(answerDiv);
 
     } catch (err) {
@@ -496,10 +657,13 @@ document.getElementById("searchForm").addEventListener("submit", async function(
 
 (async () => {
     await fetchLangLabels();
-
     const savedLang = getCurrentLang();
     await loadTranslations(savedLang);
     await initLanguageSelector();
+    initFileInput();
     applyTranslations();
     await loadPdfList();
+
+    // Restaura o último resultado de busca (caso o usuário tenha voltado do PDF)
+    restoreLastResult();
 })();
