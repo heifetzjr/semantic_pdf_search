@@ -6,7 +6,6 @@ from qdrant_client.models import (
     Filter,
     FieldCondition,
     MatchValue,
-    QueryRequest,
 )
 import uuid
 
@@ -15,18 +14,28 @@ VECTOR_SIZE     = 768        # paraphrase-multilingual-mpnet-base-v2 → 768
                               # all-MiniLM-L6-v2                      → 384
 QDRANT_PATH     = "./qdrant_storage"
 
+# ── Instância única e global ─────────────────────────────────────────
+# O modo local do Qdrant NÃO suporta múltiplas instâncias simultâneas.
+# Por isso criamos UMA SÓ vez e reutilizamos em todo o projeto.
+_client: QdrantClient | None = None
 
-def _get_client() -> QdrantClient:
+
+def get_client() -> QdrantClient:
     """
-    Modo local (sem servidor Docker).
-    Os dados ficam salvos em disco na pasta QDRANT_PATH.
+    Retorna sempre a mesma instância do cliente Qdrant (singleton).
     """
-    return QdrantClient(path=QDRANT_PATH)
+    global _client
+    if _client is None:
+        _client = QdrantClient(path=QDRANT_PATH)
+    return _client
 
 
 def init_vector_store() -> QdrantClient:
-    """Cria a coleção se ainda não existir."""
-    client   = _get_client()
+    """
+    Inicializa o cliente e cria a coleção se ainda não existir.
+    Deve ser chamado uma vez na inicialização do app.
+    """
+    client   = get_client()
     existing = [c.name for c in client.get_collections().collections]
 
     if COLLECTION_NAME not in existing:
@@ -45,8 +54,11 @@ def init_vector_store() -> QdrantClient:
 
 
 def clear_vector_store() -> QdrantClient:
-    """Apaga e recria a coleção do zero."""
-    client   = _get_client()
+    """
+    Apaga e recria a coleção usando a instância já existente.
+    NÃO cria uma nova instância — reutiliza o singleton.
+    """
+    client   = get_client()
     existing = [c.name for c in client.get_collections().collections]
 
     if COLLECTION_NAME in existing:
@@ -95,8 +107,8 @@ def similarity_search(
     top_k: int = 10,
 ) -> list:
     """
-    Busca os trechos mais relevantes.
-    Usa query_points() — API atual do qdrant-client >= 1.7.
+    Busca os trechos mais relevantes usando query_points()
+    (API do qdrant-client >= 1.7 — .search() foi removido).
     """
     response = client.query_points(
         collection_name=COLLECTION_NAME,
@@ -105,7 +117,6 @@ def similarity_search(
         with_payload=True,
     )
 
-    # query_points devolve um QueryResponse com atributo .points
     points = response.points if hasattr(response, "points") else response
 
     return [
